@@ -37,15 +37,16 @@ unsigned long standbyDelay = 3; //Number of seconds delay on long press before s
 //Colours won't exactly match how they appear on a monitor
 
 int masterBrightness = 255; //Value between 0 and 255 for master brightness of LEDS, scales all animations.
-long fadeToCol = 0x000000;
-long hexColColdStandby = 0x6D00FF; //Standby colour
-long hexCol40 = 0xE9B700;
-long hexCol50 = 0xE96600;
-long hexCol60 = 0xE90000;
+long fadeToCol = 0x000000; //The colour which wait modes transition to and from as they fade in and out
+long hexColStandby = 0x4c00ff; //Standby colour
+long hexCol40 = 0x00ffd0; //The colour that indicates 40°C, used for both the heat and wait modes
+long hexCol50 = 0xff3c00; //The colour that indicates 50°C, used for both the heat and wait modes
+long hexCol60 = 0xff0044; //The colour that indicates 60°C, used for both the heat and wait modes
+
+long colour [4] = {hexColStandby, hexCol40, hexCol50, hexCol60}; //Colour array
 
 
 void setup() {
-
   FastLED.addLeds<NEOPIXEL, ledControl>(leds, ledNum);
   FastLED.setBrightness(masterBrightness);
   pinMode(ledControl, OUTPUT);
@@ -67,13 +68,13 @@ void ISR_buttonChange() {
   }
 }
 
-void coldStandby(){
+void standby(long colour){
   while(buttonState != 1) {
     if(buttonState==1) {break;}
     if(once==0) {
       for (int i = 0; i < ledNum; ++i) {
         if(buttonState==1) {break;}
-        leds[i] = CRGB(hexColColdStandby);
+        leds[i] = CRGB(colour);
         FastLED.show();
       }
       once=1;
@@ -90,7 +91,7 @@ void coldStandby(){
       if(buttonState==1) {break;}
       for (int j = 0; j < ledNum; ++j) {
         if(buttonState==1) {break;}
-        leds[j] = blend(leds[j], hexColColdStandby, pulseDepth);
+        leds[j] = blend(leds[j], colour, pulseDepth);
       }
       FastLED.delay(pulseSpeed);
       FastLED.show();
@@ -99,7 +100,8 @@ void coldStandby(){
 }
 
 void heating(long colour){
-  while(buttonState != 1) {
+  int temporaryCounter = 0;
+  while(buttonState != 1 && temporaryCounter < 10) { //'&& temporaryCounter < 10' is temporary code until thermostat code is written, it just counts n loops of the spinner then moves to standby
     for (int i = 0; i < ledNum; ++i) {
       if(buttonState==1) {break;}
       leds[i] = blend(leds[i], colour, blendSpeed);
@@ -110,7 +112,9 @@ void heating(long colour){
       }
       FastLED.show();
     }
+    ++temporaryCounter;
   }
+  standby(colour);
 }
 
 void buttonReaction(){
@@ -132,7 +136,7 @@ void buttonReaction(){
     changeModeFlag = 0;
     while(buttonState==1) {
       for (int i = 0; i < ledNum; ++i) {
-        leds[i] = blend(leds[i], 0x46eb34, 500);
+        leds[i] = blend(leds[i], hexColStandby, 500);
         FastLED.show();
         FastLED.delay(1);
       }
@@ -159,23 +163,23 @@ void loop() {
     switch (mode) {
     case 0:
       Serial.println("Cold Standby");
-      coldStandby();
-      nextColour = hexCol40;
+      standby(colour[mode]);
+      nextColour = colour[1];
       break;
     case 1:
       Serial.println("Heating to 40");
-      nextColour = hexCol50;
-      heating(hexCol40);
+      nextColour = colour[2];
+      heating(colour[mode]);
       break;
     case 2:
       Serial.println("Heating to 50");
-      nextColour = hexCol60;
-      heating(hexCol50);
+      nextColour = colour[3];
+      heating(colour[mode]);
       break;
     case 3:
       Serial.println("Heating to 60");
-      nextColour = hexCol40;
-      heating(hexCol60);
+      nextColour = colour[1];
+      heating(colour[mode]);
       break;
     }
   }
